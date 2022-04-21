@@ -1,0 +1,57 @@
+#!/bin/bash
+# A script to remind users of useful commands from their bash history and to encourage system exploration.
+# Depends on apropos, grep, cut, and sed
+
+set -u
+
+usage () {
+  echo "Reminds you of useful commands from your history by matching keywords."
+  echo "Usage:    aufait [OPTION...] KEYWORDS"
+  echo "Example:  'aufait media' returns commands you have used before that"
+  echo "          played media, recorded media, managed media tags, etc. "
+  echo "          Also returns names of alternative programs installed on your system."
+  echo "OPTIONS are passed to apropos.  See 'apropos --help' for details."
+  return
+}
+
+if (( "$#" == 0 )); then
+  usage
+  exit
+fi
+
+# while [[ -n "$1" ]]; do
+#   case "$1" in
+#     -h | --help)  usage
+#                   exit
+#                   ;;
+#   esac
+#   shift
+# done
+
+
+
+# Temp file to contain cleaned up ~./bash_history
+commands=$(mktemp)
+
+# get all the first commands used in history, reduce to only unique entries
+cut -d" " -f1 < ~/.bash_history | sort -u > $commands
+# Remove commands preceded by '.'
+grep -v -e '^\.' $commands | sponge $commands
+# add ^ before each line and space after each
+sed -i "s/^/\^/" $commands
+sed -i "s/$/ /" $commands
+
+# Filter apropos lines that do not match anything in our history
+# "$@" passes arguments to apropos so we can leverage its own options
+echo "---------------------------"
+echo "Available on your system:"
+apropos "$@" | grep -f $commands -v
+# Filter apropos lines that match commands we have run
+echo "---------------------------"
+echo "In your recent command history:"
+apropos "$@" | grep -f $commands --color
+# to-do -- if no commands in history, then provide suggestion like "Maybe try different keywords?"
+
+# clean up
+rm $commands
+# to-do use 'trap' instead so that file is removed even if scripts above error out
